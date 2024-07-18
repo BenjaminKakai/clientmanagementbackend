@@ -1,11 +1,13 @@
 const express = require('express');
 const { Pool } = require('pg');
 const bodyParser = require('body-parser');
+const cors = require('cors');
 
 const app = express();
 const port = 3000;
 
 // Middleware
+app.use(cors());
 app.use(bodyParser.json());
 
 // PostgreSQL Pool
@@ -28,15 +30,17 @@ pool.connect((err) => {
 
 // Routes
 app.post('/clients', async (req, res) => {
-  const { project, bedrooms, budget, schedule, email, fullname, phone } = req.body;
+  const { project, bedrooms, budget, schedule, email, fullname, phone, quality } = req.body;
+  console.log('Received client data:', req.body); // Log received data
   try {
     const result = await pool.query(
-      'INSERT INTO clients (project, bedrooms, budget, schedule, email, fullname, phone) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [project, bedrooms, budget, schedule, email, fullname, phone]
+      'INSERT INTO clients (project, bedrooms, budget, schedule, email, fullname, phone, quality) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      [project, bedrooms, budget, schedule, email, fullname, phone, quality]
     );
+    console.log('Client added to database:', result.rows[0]); // Log inserted client data
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error('Error executing query', err.stack);
+    console.error('Error executing query', err.stack); // Log any errors
     res.status(500).send('Server error');
   }
 });
