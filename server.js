@@ -36,7 +36,7 @@ app.post('/clients', async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err.message);
+    console.error('Error executing query', err.stack);
     res.status(500).send('Server error');
   }
 });
@@ -46,9 +46,13 @@ app.get('/clients', async (req, res) => {
     const result = await pool.query('SELECT * FROM clients');
     res.json(result.rows);
   } catch (err) {
-    console.error(err.message);
+    console.error('Error executing query', err.stack);
     res.status(500).send('Server error');
   }
+});
+
+app.get('/', (req, res) => {
+  res.send('Server is up and running!');
 });
 
 app.listen(port, () => {
