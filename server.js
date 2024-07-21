@@ -10,18 +10,15 @@ const mime = require('mime-types');
 const app = express();
 const port = 3000;
 
-// Middleware
 app.use(cors());
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Ensure upload directory exists
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Set up multer for file uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, uploadDir);
@@ -33,7 +30,6 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// PostgreSQL Pool
 const pool = new Pool({
     user: 'clientuser',
     host: 'localhost',
@@ -42,7 +38,6 @@ const pool = new Pool({
     port: 5432,
 });
 
-// Test Database Connection
 pool.connect((err) => {
     if (err) {
         console.error('Connection error', err.stack);
@@ -51,16 +46,28 @@ pool.connect((err) => {
     }
 });
 
-// Routes
 app.post('/clients', async (req, res) => {
-    const { project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status } = req.body;
+    const { project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status, paymentDetails } = req.body;
     try {
-        const result = await pool.query(
+        await pool.query('BEGIN');
+
+        const clientResult = await pool.query(
             'INSERT INTO clients (project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
             [project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status]
         );
-        res.status(201).json(result.rows[0]);
+        const newClient = clientResult.rows[0];
+
+        if (paymentDetails) {
+            await pool.query(
+                'INSERT INTO payment_details (client_id, amount_paid, payment_duration, total_amount, balance, payment_date) VALUES ($1, $2, $3, $4, $5, $6)',
+                [newClient.id, paymentDetails.amountPaid, paymentDetails.paymentDuration, paymentDetails.totalAmount, paymentDetails.balance, new Date()]
+            );
+        }
+
+        await pool.query('COMMIT');
+        res.status(201).json(newClient);
     } catch (err) {
+        await pool.query('ROLLBACK');
         console.error('Error executing query', err.stack);
         res.status(500).send('Server error');
     }
@@ -74,7 +81,6 @@ app.post('/clients/:id/documents', upload.array('documents'), async (req, res) =
         for (const file of files) {
             const documentPath = file.path;
 
-            // Insert document metadata into the database
             await pool.query(
                 'INSERT INTO client_documents (client_id, document_name, document_path) VALUES ($1, $2, $3)',
                 [clientId, file.originalname, documentPath]
@@ -103,7 +109,6 @@ app.get('/clients/:id/documents', async (req, res) => {
     }
 });
 
-// Updated /documents/:id route
 app.get('/documents/:id', async (req, res) => {
     const documentId = req.params.id;
     try {
@@ -138,7 +143,6 @@ app.delete('/documents/:id', async (req, res) => {
             return res.status(404).send('Document not found');
         }
 
-        // Delete the file from the filesystem
         fs.unlink(result.rows[0].document_path, (err) => {
             if (err) {
                 console.error('Error deleting file:', err);
@@ -154,7 +158,11 @@ app.delete('/documents/:id', async (req, res) => {
 
 app.get('/clients', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM clients');
+        const result = await pool.query(`
+            SELECT c.*, pd.amount_paid, pd.payment_duration, pd.total_amount, pd.balance, pd.payment_date
+            FROM clients c
+            LEFT JOIN payment_details pd ON c.id = pd.client_id
+        `);
         res.json(result.rows);
     } catch (err) {
         console.error('Error executing query', err.stack);
@@ -210,10 +218,29 @@ app.put('/clients/:id', async (req, res) => {
     }
 });
 
+app.post('/clients/:id/status', async (req, res) => {
+    const clientId = req.params.id;
+    const { status } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE clients SET conversation_status = $1 WHERE id = $2 RETURNING *',
+            [status, clientId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).send('Client not found');
+        }
+        res.status(200).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error updating client status', err.stack);
+        res.status(500).send('Server error');
+    }
+});
+
 app.delete('/clients/:id', async (req, res) => {
     const clientId = req.params.id;
     try {
-        // First, delete associated documents
+        await pool.query('BEGIN');
+
         const documentResult = await pool.query('SELECT * FROM client_documents WHERE client_id = $1', [clientId]);
         for (const doc of documentResult.rows) {
             fs.unlink(doc.document_path, (err) => {
@@ -224,20 +251,21 @@ app.delete('/clients/:id', async (req, res) => {
         }
         await pool.query('DELETE FROM client_documents WHERE client_id = $1', [clientId]);
 
-        // Then, delete the client
+        await pool.query('DELETE FROM payment_details WHERE client_id = $1', [clientId]);
+
         const result = await pool.query('DELETE FROM clients WHERE id = $1 RETURNING *', [clientId]);
+
+        await pool.query('COMMIT');
+
         if (result.rows.length === 0) {
             return res.status(404).send('Client not found');
         }
         res.status(200).json(result.rows[0]);
     } catch (err) {
+        await pool.query('ROLLBACK');
         console.error('Error executing query', err.stack);
         res.status(500).send('Server error');
     }
-});
-
-app.get('/', (req, res) => {
-    res.send('Server is up and running!');
 });
 
 app.listen(port, () => {
