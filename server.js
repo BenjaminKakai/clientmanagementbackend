@@ -14,9 +14,10 @@ const port = process.env.PORT || 3000;
 // Enable CORS for all origins
 app.use(cors());
 
-// Alternatively, enable CORS for specific origins
+// If you want to restrict CORS to specific origins, use this instead:
 // app.use(cors({
-//   origin: 'http://localhost:3001'
+//   origin: ['http://localhost:3001', 'https://your-frontend-domain.com'],
+//   optionsSuccessStatus: 200
 // }));
 
 app.use(bodyParser.json());
@@ -256,6 +257,20 @@ app.put('/clients/:id', async (req, res) => {
         res.status(200).json(result.rows[0]);
     } catch (err) {
         console.error('Error updating client', err.stack);
+        res.status(500).send('Server error');
+    }
+});
+
+app.delete('/clients/:id', async (req, res) => {
+    const clientId = req.params.id;
+    try {
+        const result = await pool.query('DELETE FROM clients WHERE id = $1 RETURNING *', [clientId]);
+        if (result.rows.length === 0) {
+            return res.status(404).send('Client not found');
+        }
+        res.status(200).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error deleting client', err.stack);
         res.status(500).send('Server error');
     }
 });
