@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const { Pool } = require('pg');
+const { Pool, Client } = require('pg');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const multer = require('multer');
@@ -54,6 +54,22 @@ pool.on('connect', () => {
 pool.on('error', (err) => {
     console.error('Unexpected error on idle client', err);
     process.exit(-1);
+});
+
+// Unpooled connection
+const unpooledClient = new Client({
+    connectionString: process.env.DATABASE_URL_UNPOOLED,
+    ssl: {
+        rejectUnauthorized: false
+    }
+});
+
+unpooledClient.connect((err) => {
+    if (err) {
+        console.error('Error connecting with unpooled client', err.stack);
+    } else {
+        console.log('Connected with unpooled client');
+    }
 });
 
 app.get('/', (req, res) => {
@@ -251,5 +267,5 @@ app.post('/clients/:id/status', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+    console.log(`Server running on port ${port}`);
 });
