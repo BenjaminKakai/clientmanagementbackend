@@ -11,15 +11,24 @@ const mime = require('mime-types');
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Enable CORS for all origins
 app.use(cors());
+
+// Alternatively, enable CORS for specific origins
+// app.use(cors({
+//   origin: 'http://localhost:3001'
+// }));
+
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Create upload directory if it doesn't exist
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// Configure multer for file uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, uploadDir);
@@ -31,6 +40,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
+// Set up PostgreSQL connection pool
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
@@ -56,7 +66,7 @@ pool.on('error', (err) => {
     process.exit(-1);
 });
 
-// Unpooled connection
+// Unpooled connection for a different purpose
 const unpooledClient = new Client({
     connectionString: process.env.DATABASE_URL_UNPOOLED,
     ssl: {
@@ -71,6 +81,8 @@ unpooledClient.connect((err) => {
         console.log('Connected with unpooled client');
     }
 });
+
+// Routes
 
 app.get('/', (req, res) => {
   res.status(200).send('Welcome to the client management app');
@@ -243,25 +255,7 @@ app.put('/clients/:id', async (req, res) => {
         }
         res.status(200).json(result.rows[0]);
     } catch (err) {
-        console.error('Error executing query', err.stack);
-        res.status(500).send('Server error');
-    }
-});
-
-app.post('/clients/:id/status', async (req, res) => {
-    const clientId = req.params.id;
-    const { status } = req.body;
-    try {
-        const result = await pool.query(
-            'UPDATE clients SET conversation_status = $1 WHERE id = $2 RETURNING *',
-            [status, clientId]
-        );
-        if (result.rows.length === 0) {
-            return res.status(404).send('Client not found');
-        }
-        res.status(200).json(result.rows[0]);
-    } catch (err) {
-        console.error('Error executing query', err.stack);
+        console.error('Error updating client', err.stack);
         res.status(500).send('Server error');
     }
 });
