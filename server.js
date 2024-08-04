@@ -9,7 +9,7 @@ const fs = require('fs');
 const mime = require('mime-types');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -54,6 +54,10 @@ pool.on('connect', () => {
 pool.on('error', (err) => {
     console.error('Unexpected error on idle client', err);
     process.exit(-1);
+});
+
+app.get('/', (req, res) => {
+  res.status(200).send('Welcome to the client management app');
 });
 
 app.post('/clients', async (req, res) => {
@@ -241,43 +245,11 @@ app.post('/clients/:id/status', async (req, res) => {
         }
         res.status(200).json(result.rows[0]);
     } catch (err) {
-        console.error('Error updating client status', err.stack);
-        res.status(500).send('Server error');
-    }
-});
-
-app.delete('/clients/:id', async (req, res) => {
-    const clientId = req.params.id;
-    try {
-        await pool.query('BEGIN');
-
-        const documentResult = await pool.query('SELECT * FROM client_documents WHERE client_id = $1', [clientId]);
-        for (const doc of documentResult.rows) {
-            fs.unlink(doc.document_path, (err) => {
-                if (err) {
-                    console.error('Error deleting file:', err);
-                }
-            });
-        }
-        await pool.query('DELETE FROM client_documents WHERE client_id = $1', [clientId]);
-
-        await pool.query('DELETE FROM payment_details WHERE client_id = $1', [clientId]);
-
-        const result = await pool.query('DELETE FROM clients WHERE id = $1 RETURNING *', [clientId]);
-
-        await pool.query('COMMIT');
-
-        if (result.rows.length === 0) {
-            return res.status(404).send('Client not found');
-        }
-        res.status(200).json(result.rows[0]);
-    } catch (err) {
-        await pool.query('ROLLBACK');
         console.error('Error executing query', err.stack);
         res.status(500).send('Server error');
     }
 });
 
 app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+    console.log(`Server is running on port ${port}`);
 });
