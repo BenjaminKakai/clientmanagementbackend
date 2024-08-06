@@ -12,7 +12,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Enable CORS for all origins
-//app.use(cors());
+app.use(cors());
 
 // If you want to restrict CORS to specific origins, use this instead:
 app.use(cors({
