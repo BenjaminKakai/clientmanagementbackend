@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const { Pool, Client } = require('pg');
+const { Pool } = require('pg');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const multer = require('multer');
@@ -14,7 +14,6 @@ const authenticateJWT = require('./authMiddleware');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
 app.use(cors({
     origin: ['http://localhost:3001', 'https://your-frontend-domain.com'],
     credentials: true,
@@ -41,7 +40,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: process.env.DATABASE_URL_POOLED,
     ssl: {
         rejectUnauthorized: false
     }
@@ -62,21 +61,6 @@ pool.on('connect', () => {
 pool.on('error', (err) => {
     console.error('Unexpected error on idle client', err);
     process.exit(-1);
-});
-
-const unpooledClient = new Client({
-    connectionString: process.env.DATABASE_URL_UNPOOLED,
-    ssl: {
-        rejectUnauthorized: false
-    }
-});
-
-unpooledClient.connect((err) => {
-    if (err) {
-        console.error('Error connecting with unpooled client', err.stack);
-    } else {
-        console.log('Connected with unpooled client');
-    }
 });
 
 // Updated login route
@@ -255,8 +239,20 @@ app.get('/clients/pending', authenticateJWT, async (req, res) => {
     }
 });
 
+app.get('/clients/:id', authenticateJWT, async (req, res) => {
+    const clientId = req.params.id;
+    try {
+        const result = await pool.query('SELECT * FROM clients WHERE id = $1', [clientId]);
+        if (result.rows.length === 0) {
+            return res.status(404).send('Client not found');
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error executing query', err.stack);
+        res.status(500).send('Server error');
+    }
+});
+
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
-
-module.exports = app;
