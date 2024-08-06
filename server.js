@@ -7,30 +7,28 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const mime = require('mime-types');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const authenticateJWT = require('./authMiddleware');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Enable CORS for all origins
 app.use(cors());
-
-// If you want to restrict CORS to specific origins, use this instead:
 app.use(cors({
     origin: ['http://localhost:3001', 'https://your-frontend-domain.com'],
     credentials: true,
     optionsSuccessStatus: 200
-  }));
+}));
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Create upload directory if it doesn't exist
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Configure multer for file uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, uploadDir);
@@ -42,7 +40,6 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Set up PostgreSQL connection pool
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
@@ -50,7 +47,6 @@ const pool = new Pool({
     }
 });
 
-// Verify database connection
 pool.query('SELECT NOW()', (err, res) => {
     if (err) {
         console.error('Error connecting to the database', err.stack);
@@ -68,7 +64,6 @@ pool.on('error', (err) => {
     process.exit(-1);
 });
 
-// Unpooled connection for a different purpose
 const unpooledClient = new Client({
     connectionString: process.env.DATABASE_URL_UNPOOLED,
     ssl: {
@@ -84,13 +79,29 @@ unpooledClient.connect((err) => {
     }
 });
 
-// Routes
+// Updated login route
+app.post('/login', async (req, res) => {
+    const { email, password } = req.body;
 
-app.get('/', (req, res) => {
-  res.status(200).send('Welcome to the client management app');
+    // Hardcoded user for testing purposes
+    const testEmail = 'benjaminkakaimasai001@gmail.com';
+    const testPassword = 'co37x74bobG';
+    const hashedPassword = bcrypt.hashSync(testPassword, 10);
+    const user = { email: testEmail, password: hashedPassword };
+
+    if (email === user.email && bcrypt.compareSync(password, user.password)) {
+        const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        res.json({ token });
+    } else {
+        res.status(401).send('Invalid credentials');
+    }
 });
 
-app.post('/clients', async (req, res) => {
+app.get('/', (req, res) => {
+    res.status(200).send('Welcome to the client management app');
+});
+
+app.post('/clients', authenticateJWT, async (req, res) => {
     const { project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status, paymentDetails } = req.body;
     try {
         await pool.query('BEGIN');
@@ -117,7 +128,7 @@ app.post('/clients', async (req, res) => {
     }
 });
 
-app.post('/clients/:id/documents', upload.array('documents'), async (req, res) => {
+app.post('/clients/:id/documents', authenticateJWT, upload.array('documents'), async (req, res) => {
     const clientId = req.params.id;
     const files = req.files;
 
@@ -139,7 +150,7 @@ app.post('/clients/:id/documents', upload.array('documents'), async (req, res) =
     }
 });
 
-app.get('/clients/:id/documents', async (req, res) => {
+app.get('/clients/:id/documents', authenticateJWT, async (req, res) => {
     const clientId = req.params.id;
     try {
         const result = await pool.query(
@@ -153,7 +164,7 @@ app.get('/clients/:id/documents', async (req, res) => {
     }
 });
 
-app.get('/documents/:id', async (req, res) => {
+app.get('/documents/:id', authenticateJWT, async (req, res) => {
     const documentId = req.params.id;
     try {
         const result = await pool.query('SELECT * FROM client_documents WHERE id = $1', [documentId]);
@@ -179,7 +190,7 @@ app.get('/documents/:id', async (req, res) => {
     }
 });
 
-app.delete('/documents/:id', async (req, res) => {
+app.delete('/documents/:id', authenticateJWT, async (req, res) => {
     const documentId = req.params.id;
     try {
         const result = await pool.query('DELETE FROM client_documents WHERE id = $1 RETURNING *', [documentId]);
@@ -200,7 +211,7 @@ app.delete('/documents/:id', async (req, res) => {
     }
 });
 
-app.get('/clients', async (req, res) => {
+app.get('/clients', authenticateJWT, async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT c.*, pd.amount_paid, pd.payment_duration, pd.total_amount, pd.balance, pd.payment_date
@@ -214,7 +225,7 @@ app.get('/clients', async (req, res) => {
     }
 });
 
-app.get('/clients/finalized', async (req, res) => {
+app.get('/clients/finalized', authenticateJWT, async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM clients WHERE conversation_status = 'Finalized Deal'");
         res.json(result.rows);
@@ -224,7 +235,7 @@ app.get('/clients/finalized', async (req, res) => {
     }
 });
 
-app.get('/clients/high-quality', async (req, res) => {
+app.get('/clients/high-quality', authenticateJWT, async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM clients WHERE quality = 'high'");
         res.json(result.rows);
@@ -234,7 +245,7 @@ app.get('/clients/high-quality', async (req, res) => {
     }
 });
 
-app.get('/clients/pending', async (req, res) => {
+app.get('/clients/pending', authenticateJWT, async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM clients WHERE conversation_status = 'Pending'");
         res.json(result.rows);
@@ -244,38 +255,8 @@ app.get('/clients/pending', async (req, res) => {
     }
 });
 
-app.put('/clients/:id', async (req, res) => {
-    const clientId = req.params.id;
-    const { conversation_status, project, bedrooms, budget, schedule, email, fullname, phone, quality } = req.body;
-    try {
-        const result = await pool.query(
-            'UPDATE clients SET conversation_status = $1, project = $2, bedrooms = $3, budget = $4, schedule = $5, email = $6, fullname = $7, phone = $8, quality = $9 WHERE id = $10 RETURNING *',
-            [conversation_status, project, bedrooms, budget, schedule, email, fullname, phone, quality, clientId]
-        );
-        if (result.rows.length === 0) {
-            return res.status(404).send('Client not found');
-        }
-        res.status(200).json(result.rows[0]);
-    } catch (err) {
-        console.error('Error updating client', err.stack);
-        res.status(500).send('Server error');
-    }
-});
-
-app.delete('/clients/:id', async (req, res) => {
-    const clientId = req.params.id;
-    try {
-        const result = await pool.query('DELETE FROM clients WHERE id = $1 RETURNING *', [clientId]);
-        if (result.rows.length === 0) {
-            return res.status(404).send('Client not found');
-        }
-        res.status(200).json(result.rows[0]);
-    } catch (err) {
-        console.error('Error deleting client', err.stack);
-        res.status(500).send('Server error');
-    }
-});
-
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
+
+module.exports = app;
