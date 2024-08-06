@@ -19,6 +19,7 @@
     }
   ],
   "env": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "JWT_SECRET": "Rn+WoKJlnPI8i4i4c3t5BMHVXG7yV/gPVhWmlwGaBVc="
   }
 }
