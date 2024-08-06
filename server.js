@@ -15,10 +15,11 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 
 // If you want to restrict CORS to specific origins, use this instead:
- app.use(cors({
-   origin: ['http://localhost:3001', 'https://your-frontend-domain.com'],
-   optionsSuccessStatus: 200
- }));
+app.use(cors({
+    origin: ['http://localhost:3001', 'https://your-frontend-domain.com'],
+    credentials: true,
+    optionsSuccessStatus: 200
+  }));
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
