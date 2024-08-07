@@ -39,6 +39,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
+// Use the pooled connection string
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL_POOLED,
     ssl: {
@@ -248,11 +249,44 @@ app.get('/clients/:id', authenticateJWT, async (req, res) => {
         }
         res.json(result.rows[0]);
     } catch (err) {
-        console.error('Error executing query', err.stack);
+        console.error('Error fetching client', err.stack);
+        res.status(500).send('Server error');
+    }
+});
+
+app.delete('/clients/:id', authenticateJWT, async (req, res) => {
+    const clientId = req.params.id;
+    try {
+        const result = await pool.query('DELETE FROM clients WHERE id = $1 RETURNING *', [clientId]);
+        if (result.rows.length === 0) {
+            return res.status(404).send('Client not found');
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error deleting client', err.stack);
+        res.status(500).send('Server error');
+    }
+});
+
+app.put('/clients/:id', authenticateJWT, async (req, res) => {
+    const clientId = req.params.id;
+    const { project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status } = req.body;
+
+    try {
+        const result = await pool.query(
+            'UPDATE clients SET project = $1, bedrooms = $2, budget = $3, schedule = $4, email = $5, fullname = $6, phone = $7, quality = $8, conversation_status = $9 WHERE id = $10 RETURNING *',
+            [project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status, clientId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).send('Client not found');
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error updating client', err.stack);
         res.status(500).send('Server error');
     }
 });
 
 app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+    console.log(`Server is running on port ${port}`);
 });
