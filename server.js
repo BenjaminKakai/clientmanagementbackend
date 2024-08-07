@@ -15,10 +15,11 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors({
-    origin: ['http://localhost:3001', 'https://your-frontend-domain.com'],
+    origin: 'http://localhost:3001',  // Allow requests from localhost:3001
     credentials: true,
     optionsSuccessStatus: 200
 }));
+
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
