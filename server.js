@@ -44,7 +44,7 @@ const upload = multer({ storage: storage });
 
 // Use the pooled connection string
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL_POOLED,
+    connectionString: 'postgresql://rendertangentdb_user:UEfjvF7paZAbslNeQ78uhhiYs6MMp8eS@dpg-cqp12u08fa8c73c4ebsg-a.oregon-postgres.render.com/rendertangentdb?sslmode=require',
     ssl: {
         rejectUnauthorized: false
     }
