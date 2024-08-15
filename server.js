@@ -18,10 +18,10 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 
 app.use(cors({
-    origin: 'http://localhost:3001',  // Allow requests from localhost:3001
-    credentials: true,
-    optionsSuccessStatus: 200
-}));
+    origin: 'https://tangentinhouse.netlify.app', // Allow requests from localhost and your Netlify domain
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }));
 
 
 app.use(bodyParser.json());
@@ -33,12 +33,12 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 const corsOptions = {
-    origin: 'http://localhost:3001', 
+    origin: ['http://localhost:3001', 'https://your-frontend-domain.vercel.app'], // Add your frontend's Vercel domain
     credentials: true,
     optionsSuccessStatus: 200
-  };
-  
-  app.use(cors(corsOptions));
+};
+
+app.use(cors(corsOptions));
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
