@@ -14,15 +14,17 @@ const authenticateJWT = require('./authMiddleware');
 
 const app = express();
 const port = process.env.PORT || 3000;
-const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 
 // Apply CORS middleware before other middleware and routes
 app.use(cors({
-  origin: '*',
+  origin: 'https://tangentinhouse.netlify.app', // Replace '*' with specific origin
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Handle pre-flight requests
+app.options('*', cors());
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -80,7 +82,6 @@ app.get('/', (req, res) => {
     res.status(200).send('Welcome to the client management app');
 });
 
-// Ensure CORS is handled before other routes and error handling
 app.post('/clients', authenticateJWT, async (req, res) => {
     const { project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status, paymentDetails } = req.body;
     try {
@@ -107,7 +108,6 @@ app.post('/clients', authenticateJWT, async (req, res) => {
         res.status(500).send('Server error');
     }
 });
-
 
 app.post('/clients/:id/documents', authenticateJWT, upload.array('documents'), async (req, res) => {
     const clientId = req.params.id;
@@ -253,42 +253,22 @@ app.get('/clients/:id', authenticateJWT, async (req, res) => {
 app.delete('/clients/:id', authenticateJWT, async (req, res) => {
     const clientId = req.params.id;
     try {
+        await pool.query('BEGIN');
+        await pool.query('DELETE FROM client_documents WHERE client_id = $1', [clientId]);
         const result = await pool.query('DELETE FROM clients WHERE id = $1 RETURNING *', [clientId]);
+
         if (result.rows.length === 0) {
             return res.status(404).send('Client not found');
         }
-        res.json(result.rows[0]);
+        await pool.query('COMMIT');
+        res.status(200).json(result.rows[0]);
     } catch (err) {
+        await pool.query('ROLLBACK');
         console.error('Error deleting client', err.stack);
         res.status(500).send('Server error');
     }
 });
 
-app.put('/clients/:id', authenticateJWT, async (req, res) => {
-    const clientId = req.params.id;
-    const { project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status } = req.body;
-
-    try {
-        const result = await pool.query(
-            'UPDATE clients SET project = $1, bedrooms = $2, budget = $3, schedule = $4, email = $5, fullname = $6, phone = $7, quality = $8, conversation_status = $9 WHERE id = $10 RETURNING *',
-            [project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status, clientId]
-        );
-        if (result.rows.length === 0) {
-            return res.status(404).send('Client not found');
-        }
-        res.json(result.rows[0]);
-    } catch (err) {
-        console.error('Error updating client', err.stack);
-        res.status(500).send('Server error');
-    }
-});
-
-// Error handling middleware (optional but recommended)
-app.use((err, req, res, next) => {
-    console.error('Unhandled error:', err);
-    res.status(500).send('Server error');
-});
-
 app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+    console.log(`Server running on port ${port}`);
 });
