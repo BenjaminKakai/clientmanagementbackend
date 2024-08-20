@@ -1,3 +1,4 @@
+// server.js or index.js
 require('dotenv').config();
 
 const express = require('express');
@@ -10,7 +11,7 @@ const fs = require('fs');
 const mime = require('mime-types');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const authenticateJWT = require('./authMiddleware');
+const authenticateJWT = require('./authMiddleware'); // Ensure this import is correct
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -280,3 +281,7 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
+
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+  });
