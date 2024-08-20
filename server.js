@@ -15,28 +15,25 @@ const authenticateJWT = require('./authMiddleware');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Simplified CORS configuration
-const corsOptions = {
-    origin: 'https://tangentinhouse.netlify.app',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-    optionsSuccessStatus: 200
-};
-
-app.use(cors(corsOptions));
+// Apply CORS middleware before other middleware and routes
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Ensure uploads directory exists
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Use the pooled connection string
+// Database setup
 const pool = new Pool({
-    connectionString: 'postgresql://rendertangentdb_user:UEfjvF7paZAbslNeQ78uhhiYs6MMp8eS@dpg-cqp12u08fa8c73c4ebsg-a.oregon-postgres.render.com/rendertangentdb?sslmode=require',
+    connectionString: process.env.DATABASE_URL_POOLED,
     ssl: {
         rejectUnauthorized: false
     }
@@ -59,7 +56,7 @@ pool.on('error', (err) => {
     process.exit(-1);
 });
 
-// Updated login route
+// Routes
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -81,7 +78,7 @@ app.get('/', (req, res) => {
     res.status(200).send('Welcome to the client management app');
 });
 
-
+// Ensure CORS is handled before other routes and error handling
 app.post('/clients', authenticateJWT, async (req, res) => {
     const { project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status, paymentDetails } = req.body;
     try {
@@ -281,6 +278,12 @@ app.put('/clients/:id', authenticateJWT, async (req, res) => {
         console.error('Error updating client', err.stack);
         res.status(500).send('Server error');
     }
+});
+
+// Error handling middleware (optional but recommended)
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).send('Server error');
 });
 
 app.listen(port, () => {
