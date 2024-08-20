@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const mime = require('mime-types');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 const authenticateJWT = require('./authMiddleware');
 
 const app = express();
@@ -16,12 +17,11 @@ const port = process.env.PORT || 3000;
 const upload = multer({ dest: 'uploads/' });
 
 // Apply CORS middleware before other middleware and routes
-
 app.use(cors({
     origin: 'https://tangentinhouse.netlify.app',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
-  }));
+}));
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -58,13 +58,15 @@ pool.on('error', (err) => {
 });
 
 // Routes
+
+// Login route for JWT token generation
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     // Hardcoded user for testing purposes
     const testEmail = 'benjaminkakaimasai001@gmail.com';
     const testPassword = 'co37x74bobG';
-    const hashedPassword = jwt.sign(testPassword, process.env.JWT_SECRET); // Updated for consistency
+    const hashedPassword = bcrypt.hashSync(testPassword, 10); // Hash the test password
     const user = { email: testEmail, password: hashedPassword };
 
     if (email === user.email && bcrypt.compareSync(password, user.password)) {
@@ -73,6 +75,13 @@ app.post('/login', async (req, res) => {
     } else {
         res.status(401).send('Invalid credentials');
     }
+});
+
+// Token refresh route
+app.post('/refresh-token', authenticateJWT, (req, res) => {
+    const { email } = req.user;
+    const newToken = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token: newToken });
 });
 
 app.get('/', (req, res) => {
@@ -248,36 +257,26 @@ app.get('/clients/:id', authenticateJWT, async (req, res) => {
     }
 });
 
-
 app.delete('/clients/:id', authenticateJWT, async (req, res) => {
     const clientId = req.params.id;
     try {
-        // Begin transaction
-        await pool.query('BEGIN');
-
-        // Delete associated payment details
-        await pool.query('DELETE FROM payment_details WHERE client_id = $1', [clientId]);
-
-        // Delete client record
         const result = await pool.query('DELETE FROM clients WHERE id = $1 RETURNING *', [clientId]);
-
         if (result.rows.length === 0) {
-            await pool.query('ROLLBACK');
             return res.status(404).send('Client not found');
         }
-
-        // Commit transaction
-        await pool.query('COMMIT');
-
         res.status(200).json(result.rows[0]);
     } catch (err) {
-        await pool.query('ROLLBACK');
         console.error('Error deleting client', err.stack);
         res.status(500).send('Server error');
     }
 });
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).send('Internal Server Error');
+});
+
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
-
