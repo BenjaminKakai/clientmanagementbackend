@@ -15,14 +15,16 @@ const authenticateJWT = require('./authMiddleware');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
-
-app.use(cors({
-    origin: 'https://tangentinhouse.netlify.app', // Allow requests from localhost and your Netlify domain
+// Simplified CORS configuration
+const corsOptions = {
+    origin: 'https://tangentinhouse.netlify.app',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-  }));
+    credentials: true,
+    optionsSuccessStatus: 200
+};
 
+app.use(cors(corsOptions));
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -31,25 +33,6 @@ const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
-
-const corsOptions = {
-    origin: ['http://localhost:3001', 'https://your-frontend-domain.vercel.app'], // Add your frontend's Vercel domain
-    credentials: true,
-    optionsSuccessStatus: 200
-};
-
-app.use(cors(corsOptions));
-
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, uploadDir);
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + '-' + file.originalname);
-    }
-});
-
-const upload = multer({ storage: storage });
 
 // Use the pooled connection string
 const pool = new Pool({
@@ -97,6 +80,7 @@ app.post('/login', async (req, res) => {
 app.get('/', (req, res) => {
     res.status(200).send('Welcome to the client management app');
 });
+
 
 app.post('/clients', authenticateJWT, async (req, res) => {
     const { project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status, paymentDetails } = req.body;
