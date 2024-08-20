@@ -34,12 +34,19 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 // Database setup
+const { Pool } = require('pg');
+
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL_POOLED,
     ssl: {
         rejectUnauthorized: false
-    }
+    },
+    connectionTimeoutMillis: 5000, // Connection timeout in milliseconds
+    idleTimeoutMillis: 10000,      // Idle timeout in milliseconds
 });
+
+module.exports = pool;
+
 
 pool.query('SELECT NOW()', (err, res) => {
     if (err) {
