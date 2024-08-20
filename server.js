@@ -14,6 +14,8 @@ const authenticateJWT = require('./authMiddleware');
 
 const app = express();
 const port = process.env.PORT || 3000;
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
 
 // Apply CORS middleware before other middleware and routes
 app.use(cors({
@@ -105,6 +107,7 @@ app.post('/clients', authenticateJWT, async (req, res) => {
         res.status(500).send('Server error');
     }
 });
+
 
 app.post('/clients/:id/documents', authenticateJWT, upload.array('documents'), async (req, res) => {
     const clientId = req.params.id;
