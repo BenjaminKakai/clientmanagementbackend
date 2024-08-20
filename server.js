@@ -9,7 +9,6 @@ const path = require('path');
 const fs = require('fs');
 const mime = require('mime-types');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
 const authenticateJWT = require('./authMiddleware');
 
 const app = express();
@@ -18,13 +17,10 @@ const upload = multer({ dest: 'uploads/' });
 
 // Apply CORS middleware before other middleware and routes
 app.use(cors({
-  origin: 'https://tangentinhouse.netlify.app', // Replace '*' with specific origin
+  origin: 'https://tangentinhouse.netlify.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
-// Handle pre-flight requests
-app.options('*', cors());
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -67,7 +63,7 @@ app.post('/login', async (req, res) => {
     // Hardcoded user for testing purposes
     const testEmail = 'benjaminkakaimasai001@gmail.com';
     const testPassword = 'co37x74bobG';
-    const hashedPassword = bcrypt.hashSync(testPassword, 10);
+    const hashedPassword = jwt.sign(testPassword, process.env.JWT_SECRET); // Updated for consistency
     const user = { email: testEmail, password: hashedPassword };
 
     if (email === user.email && bcrypt.compareSync(password, user.password)) {
@@ -82,6 +78,7 @@ app.get('/', (req, res) => {
     res.status(200).send('Welcome to the client management app');
 });
 
+// Ensure CORS is handled before other routes and error handling
 app.post('/clients', authenticateJWT, async (req, res) => {
     const { project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status, paymentDetails } = req.body;
     try {
@@ -250,17 +247,27 @@ app.get('/clients/:id', authenticateJWT, async (req, res) => {
     }
 });
 
+
 app.delete('/clients/:id', authenticateJWT, async (req, res) => {
     const clientId = req.params.id;
     try {
+        // Begin transaction
         await pool.query('BEGIN');
-        await pool.query('DELETE FROM client_documents WHERE client_id = $1', [clientId]);
+
+        // Delete associated payment details
+        await pool.query('DELETE FROM payment_details WHERE client_id = $1', [clientId]);
+
+        // Delete client record
         const result = await pool.query('DELETE FROM clients WHERE id = $1 RETURNING *', [clientId]);
 
         if (result.rows.length === 0) {
+            await pool.query('ROLLBACK');
             return res.status(404).send('Client not found');
         }
+
+        // Commit transaction
         await pool.query('COMMIT');
+
         res.status(200).json(result.rows[0]);
     } catch (err) {
         await pool.query('ROLLBACK');
@@ -270,5 +277,6 @@ app.delete('/clients/:id', authenticateJWT, async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+    console.log(`Server is running on port ${port}`);
 });
+
