@@ -60,6 +60,11 @@ pool.on('error', (err) => {
 
 // Routes
 
+// Health check route
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
 // Login route for JWT token generation
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
@@ -89,7 +94,8 @@ app.get('/', (req, res) => {
     res.status(200).send('Welcome to the client management app');
 });
 
-// Ensure CORS is handled before other routes and error handling
+// Define your other routes here...
+
 app.post('/clients', authenticateJWT, async (req, res) => {
     const { project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status, paymentDetails } = req.body;
     try {
@@ -253,26 +259,11 @@ app.get('/clients/:id', authenticateJWT, async (req, res) => {
         }
         res.json(result.rows[0]);
     } catch (err) {
-        console.error('Error fetching client', err.stack);
+        console.error('Error executing query', err.stack);
         res.status(500).send('Server error');
     }
 });
 
-app.delete('/clients/:id', authenticateJWT, async (req, res) => {
-    const clientId = req.params.id;
-    try {
-        const result = await pool.query('DELETE FROM clients WHERE id = $1 RETURNING *', [clientId]);
-        if (result.rows.length === 0) {
-            return res.status(404).send('Client not found');
-        }
-        res.status(200).json(result.rows[0]);
-    } catch (err) {
-        console.error('Error deleting client', err.stack);
-        res.status(500).send('Server error');
-    }
-});
-
-// Error handling middleware
 app.use((err, req, res, next) => {
     console.error('Unhandled error:', err);
     res.status(500).send('Internal Server Error');
@@ -281,7 +272,3 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
-
-app.get('/health', (req, res) => {
-    res.status(200).send('OK');
-  });
