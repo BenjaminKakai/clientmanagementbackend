@@ -16,11 +16,12 @@ const port = process.env.PORT || 3000;
 const upload = multer({ dest: 'uploads/' });
 
 // Apply CORS middleware before other middleware and routes
+
 app.use(cors({
-  origin: 'https://tangentinhouse.netlify.app',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+    origin: 'https://tangentinhouse.netlify.app',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  }));
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
