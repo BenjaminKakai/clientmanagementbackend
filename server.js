@@ -1,8 +1,7 @@
-// server.js or index.js
 require('dotenv').config();
 
 const express = require('express');
-
+const { Pool } = require('pg');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const multer = require('multer');
@@ -34,8 +33,6 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 // Database setup
-const { Pool } = require('pg');
-
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL_POOLED,
     ssl: {
@@ -43,17 +40,6 @@ const pool = new Pool({
     },
     connectionTimeoutMillis: 5000, // Connection timeout in milliseconds
     idleTimeoutMillis: 10000,      // Idle timeout in milliseconds
-});
-
-module.exports = pool;
-
-
-pool.query('SELECT NOW()', (err, res) => {
-    if (err) {
-        console.error('Error connecting to the database', err.stack);
-    } else {
-        console.log('Connected to the database:', res.rows[0]);
-    }
 });
 
 pool.on('connect', () => {
@@ -271,11 +257,18 @@ app.get('/clients/:id', authenticateJWT, async (req, res) => {
     }
 });
 
+// Error handling middleware
 app.use((err, req, res, next) => {
     console.error('Unhandled error:', err);
     res.status(500).send('Internal Server Error');
 });
 
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-});
+// Export for serverless function deployment
+module.exports = app;
+
+// Start the server
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(port, () => {
+        console.log(`Server is running on port ${port}`);
+    });
+}
