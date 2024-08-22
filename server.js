@@ -18,10 +18,14 @@ const upload = multer({ dest: 'uploads/' });
 
 // Apply CORS middleware before other middleware and routes
 app.use(cors({
-    origin: 'https://tangentinhouse.netlify.app',
+    origin: 'https://66c6fc6dd7e7ad2cda719ae0--tangentinhouse.netlify.app',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true // If using cookies or credentials
 }));
+
+// Handle preflight requests
+app.options('*', cors());
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -38,8 +42,8 @@ const pool = new Pool({
     ssl: {
         rejectUnauthorized: false
     },
-    connectionTimeoutMillis: 5000, // Connection timeout in milliseconds
-    idleTimeoutMillis: 10000,      // Idle timeout in milliseconds
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 10000,
 });
 
 pool.on('connect', () => {
@@ -50,8 +54,6 @@ pool.on('error', (err) => {
     console.error('Unexpected error on idle client', err);
     process.exit(-1);
 });
-
-// Routes
 
 // Health check route
 app.get('/health', (req, res) => {
@@ -65,7 +67,7 @@ app.post('/login', async (req, res) => {
     // Hardcoded user for testing purposes
     const testEmail = 'benjaminkakaimasai001@gmail.com';
     const testPassword = 'co37x74bobG';
-    const hashedPassword = bcrypt.hashSync(testPassword, 10); // Hash the test password
+    const hashedPassword = bcrypt.hashSync(testPassword, 10);
     const user = { email: testEmail, password: hashedPassword };
 
     if (email === user.email && bcrypt.compareSync(password, user.password)) {
@@ -87,8 +89,7 @@ app.get('/', (req, res) => {
     res.status(200).send('Welcome to the client management app');
 });
 
-// Define your other routes here...
-
+// Client routes
 app.post('/clients', authenticateJWT, async (req, res) => {
     const { project, bedrooms, budget, schedule, email, fullname, phone, quality, conversation_status, paymentDetails } = req.body;
     try {
