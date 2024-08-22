@@ -252,23 +252,31 @@ app.get('/clients/:id', authenticateJWT, async (req, res) => {
         }
         res.json(result.rows[0]);
     } catch (err) {
-        console.error('Error executing query', err.stack);
+        console.error('Error fetching client', err.stack);
+        res.status(500).send('Server error');
+    }
+});
+
+app.delete('/clients/:id', authenticateJWT, async (req, res) => {
+    const clientId = req.params.id;
+    try {
+        const result = await pool.query('DELETE FROM clients WHERE id = $1 RETURNING *', [clientId]);
+        if (result.rows.length === 0) {
+            return res.status(404).send('Client not found');
+        }
+        res.status(200).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error deleting client', err.stack);
         res.status(500).send('Server error');
     }
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error('Unhandled error:', err);
-    res.status(500).send('Internal Server Error');
+    console.error('Unhandled error:', err.stack);
+    res.status(500).send('Server error');
 });
 
-// Export for serverless function deployment
-module.exports = app;
-
-// Start the server
-if (process.env.NODE_ENV !== 'production') {
-    app.listen(port, () => {
-        console.log(`Server is running on port ${port}`);
-    });
-}
+app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+});
