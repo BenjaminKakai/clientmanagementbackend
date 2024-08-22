@@ -10,22 +10,35 @@ const fs = require('fs');
 const mime = require('mime-types');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const authenticateJWT = require('./authMiddleware'); // Ensure this import is correct
+const authenticateJWT = require('./authMiddleware');
 
 const app = express();
 const port = process.env.PORT || 3000;
 const upload = multer({ dest: 'uploads/' });
 
-// Apply CORS middleware before other middleware and routes
-app.use(cors({
+// CORS configuration
+const corsOptions = {
     origin: 'https://66c6fc6dd7e7ad2cda719ae0--tangentinhouse.netlify.app',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true // If using cookies or credentials
-}));
+    credentials: true,
+    optionsSuccessStatus: 204
+};
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
 
 // Handle preflight requests
-app.options('*', cors());
+app.options('*', cors(corsOptions));
+
+// Middleware to set CORS headers for all responses
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', 'https://66c6fc6dd7e7ad2cda719ae0--tangentinhouse.netlify.app');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    next();
+});
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
