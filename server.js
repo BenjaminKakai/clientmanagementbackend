@@ -16,9 +16,14 @@ const app = express();
 const port = process.env.PORT || 3000;
 const upload = multer({ dest: 'uploads/' });
 
+
+//console.console.console.log();
+
+console.log('JWT_SECRET:', process.env.JWT_SECRET ? 'is set' : 'is not set');
+
 // CORS configuration
 const corsOptions = {
-    origin: 'https://66c6fc6dd7e7ad2cda719ae0--tangentinhouse.netlify.app',
+    origin: 'http://localhost:3001',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -33,7 +38,8 @@ app.options('*', cors(corsOptions));
 
 // Middleware to set CORS headers for all responses
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'https://66c6fc6dd7e7ad2cda719ae0--tangentinhouse.netlify.app');
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3001');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.header('Access-Control-Allow-Credentials', 'true');
@@ -74,6 +80,7 @@ app.get('/health', (req, res) => {
 });
 
 // Login route for JWT token generation
+// Login route for JWT token generation
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -85,11 +92,16 @@ app.post('/login', async (req, res) => {
 
     if (email === user.email && bcrypt.compareSync(password, user.password)) {
         const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        
+        // Add this line to log the generated token
+        console.log('Generated Token:', token);
+
         res.json({ token });
     } else {
         res.status(401).send('Invalid credentials');
     }
 });
+
 
 // Token refresh route
 app.post('/refresh-token', authenticateJWT, (req, res) => {
