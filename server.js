@@ -16,9 +16,6 @@ const app = express();
 const port = process.env.PORT || 3000;
 const upload = multer({ dest: 'uploads/' });
 
-
-//console.console.console.log();
-
 console.log('JWT_SECRET:', process.env.JWT_SECRET ? 'is set' : 'is not set');
 
 // CORS configuration
@@ -80,7 +77,6 @@ app.get('/health', (req, res) => {
 });
 
 // Login route for JWT token generation
-// Login route for JWT token generation
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -101,7 +97,6 @@ app.post('/login', async (req, res) => {
         res.status(401).send('Invalid credentials');
     }
 });
-
 
 // Token refresh route
 app.post('/refresh-token', authenticateJWT, (req, res) => {
@@ -138,6 +133,28 @@ app.post('/clients', authenticateJWT, async (req, res) => {
     } catch (err) {
         await pool.query('ROLLBACK');
         console.error('Error executing query', err.stack);
+        res.status(500).send('Server error');
+    }
+});
+
+// New status update route
+app.post('/clients/:id/status', authenticateJWT, async (req, res) => {
+    const clientId = req.params.id;
+    const { status } = req.body;
+    
+    try {
+        const result = await pool.query(
+            'UPDATE clients SET conversation_status = $1 WHERE id = $2 RETURNING *',
+            [status, clientId]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).send('Client not found');
+        }
+        
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error updating client status:', err.stack);
         res.status(500).send('Server error');
     }
 });
